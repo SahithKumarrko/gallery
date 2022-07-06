@@ -1,0 +1,23 @@
+-- DROP TABLE IF EXISTS user;
+DROP TABLE IF EXISTS post;
+-- DROP TABLE IF EXISTS favorites;
+CREATE TABLE IF NOT EXISTS user (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL
+);
+
+CREATE TABLE post (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  author_id INTEGER NOT NULL,
+  created TEXT NOT NULL,
+  title TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  persons TEXT,
+  is_url INTEGER DEFAULT 0,
+  FOREIGN KEY (author_id) REFERENCES user (id)
+);
+
+CREATE TABLE IF NOT EXISTS favorites (
+  favorite_id TEXT
+);

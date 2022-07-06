@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block g_header %}
+<h1 style="margin: 0;text-align:center;">{% block title %}Posts{% endblock %}</h1>
+<header style="justify-content: center;">
+  {% if is_favorites %}
+<a class="action" href="/get_favorites/randomize">Random</a>
+{% else %}
+<a class="action" href="/get_favorites">Favorites</a>
+<a class="action" href="{{ url_for('gallery.randomize') }}">Random</a>
+  {% endif %}
+  {% if g.user %}
+    <a class="action" href="{{ url_for('gallery.create') }}">New</a>
+  {% endif %}
+</header>
+{% endblock %}
+{% block grid %}
+
+  <script>
+    var scrolled_bottom = false;
+    var loading = false;
+    var complete = false;
+    var len = parseInt("{{ posts|length }}");
+    var is_favorites = "{{ is_favorites }}" == "True";
+    var base_url = '{{ base_url }}';
+    var s = document.documentElement.scrollTop + document.documentElement.clientHeight;
+       if (s>=getDocHeight() - 20 && !loading && !complete){
+        loading = true;
+        console.log("Scrolled to the bottom");
+        load_more();
+    }
+    function open_image(post_id,id,name,created){
+      console.log(id,post_id,name,is_favorites);
+      e = document.getElementById(id).getElementsByTagName("img")[0].cloneNode();
+      f = document.getElementsByClassName("open-file");
+      if (f.length > 0){
+        f[0].classList.replace("open-file","close-file")
+      }
+      f = document.getElementsByClassName("close-file")[0];
+      f.classList.remove("close-file");
+      f.classList.add("open-file");
+      ff = f.getElementsByTagName("div")
+      ff[0].innerHTML = "";
+      f = f.getElementsByTagName("div")
+      e.style.maxHeight = "65%";
+      
+      f[0].insertAdjacentHTML("afterbegin", `<div style="height: 8%;width: 100%;position: absolute;top: 0;"><div style="display: flex;align-items: center;justify-content: center;"><div class="g-btn" onclick="download_file('`+id + `', '`+name+`','`+ base_url +`');">Download</div><div class="g-btn" onclick="close_file()">Close</div>` + (is_favorites ? `<div class="g-btn" onclick="remove_favorite(`+post_id+`,'`+id+`')">Remove Favorite</div>` : `<div class="g-btn" onclick="favorite(`+post_id+`)">Favorite</div>`) + `</div></div><div class='g-title' style=""><h3>`+name+`</h3><h5 style='color: rgba(255,255,255,0.7) !important;'>`+created+`</h5></div>`)
+      f[0].insertAdjacentElement("afterbegin",e);
+    }
+
+    function close_file(){
+      console.log("closing");
+      f = document.getElementsByClassName("open-file");
+      if (f.length > 0){
+        f[0].classList.replace("open-file","close-file")
+      }
+      f = document.getElementsByClassName("close-file")[0];
+      ff = f.getElementsByTagName("div")
+      ff[0].innerHTML = "";
+    }
+
+    function favorite(post_id){
+      console.log("Favoriting :: ",post_id)
+      const xhttp = new XMLHttpRequest();
+      xhttp.onload = function() {
+        console.log(this.response);
+      }
+      xhttp.open("GET", "/favorite/"+post_id);
+      xhttp.send();
+      console.log("Req sent");
+    }
+
+    function remove_favorite(post_id, id){
+      console.log("Removing Favoriting :: ",post_id, id)
+      const xhttp = new XMLHttpRequest();
+      xhttp.onload = function() {
+        console.log(this.response);
+      }
+      xhttp.open("GET", "/remove-favorite/"+post_id);
+      xhttp.send();
+      console.log("Req sent");
+      close_file();
+      document.getElementById(id).remove()
+    }
+
+    function download_file(id, name){
+      
+      e = document.getElementById(id).getElementsByTagName("img")[0].cloneNode();
+      url = e.getAttribute("src")
+      if(!(url.startsWith("http") || url.startsWith("data"))){
+        url = base_url + url
+      }
+      var link = document.createElement("a");
+      if (!name.includes(".")){
+        name = name + ".png"
+      }
+      link.download = name;
+      console.log("downloading :: ",id,name,url);
+      link.href = url;
+      link.click();
+    }
+
+    function getDocHeight() {
+      var D = document;
+      return Math.max(
+          D.body.scrollHeight, D.documentElement.scrollHeight,
+          D.body.offsetHeight, D.documentElement.offsetHeight,
+          D.body.clientHeight, D.documentElement.clientHeight
+      );
+    }
+
+    function add_posts(posts){
+      console.log("Adding posts :: ",posts);
+      e = document.getElementsByClassName("grid-container")[0];
+      for(var i = 0;i<posts.length;i++){
+        var fp = posts[i]['file_path'];
+        var img = "/contents/"+fp;
+        console.log(fp,img);
+        var html = `<div id="image-`+(len+i+1)+`" onclick="open_image(`+posts[i]["id"]+`,'image-`+(len+i+1)+`', '`+posts[i]["title"]+`','`+posts[i]["created"]+`')"><img src="`+img+`"></div>`;
+        
+        e.insertAdjacentHTML("beforeend",html);
+      }
+    }
+
+    function load_more(){
+      var offset = 3;
+      console.log("loadind more",len)
+      const xhttp = new XMLHttpRequest();
+      var responses = [];
+      xhttp.onload = function() {
+        console.log(this.response);
+        var r = JSON.parse(this.response);
+        len = r['end'];
+        loading = false;
+        add_posts(r["posts"]);
+        if(r["posts"].length != offset){
+          complete = true;
+          document.getElementById("loading").innerText = "No more photos/videos.";
+        }
+        console.log("Complete");
+      }
+      type = "{{ is_favorites }}" == "True" ? "favorites" : "p";
+      xhttp.open("GET", "/load-more/" + len +"/" + offset +"/" +type);
+      xhttp.send();
+    }
+
+    window.onscroll = function()
+    {
+       var s = document.documentElement.scrollTop + document.documentElement.clientHeight;
+       if (s>=getDocHeight() - 20 && !loading && !complete){
+        loading = true;
+        console.log("Scrolled to the bottom");
+        load_more();
+       }
+    };
+    
+  </script>
+  
+  {% for post in posts %}
+    <!-- <article class="post"> -->
+      <!-- <header>
+        <div>
+          <h1>{{ post['title'] }}</h1>
+          <div class="about">by {{ post['username'] }} on {{ post['created']|strftime  }}</div>
+        </div>
+        {% if g.user['id'] == post['author_id'] %}
+          <a class="action" href="{{ url_for('gallery.update', id=post['id']) }}">Edit</a>
+        {% endif %}
+      </header> -->
+      <!-- <p class="body">{{ post['persons'] }}</p>
+      <p class="body">{{ post['file_path'] }}</p> -->
+      {% set name = post['title'] %}
+      {% set created_on = post['created'] %}
+      {% set post_id = post['id'] %}
+      
+      <!-- {% if post['is_url'] == 1 %}
+      <div id="image-{{ loop.index }}" onclick="open_image('image-{{ loop.index }}','{{ name }}','{{ base_url }}')"><img src="{{ post['file_path'] }}"></div>
+      {% else %} -->
+      <div id="image-{{ loop.index }}" onclick="open_image('{{post_id}}','image-{{ loop.index }}','{{ name }}', '{{ created_on }}')"><img src="{{ url_for('files.static',filename=post['file_path']) }}" ></div>
+      <!-- {% endif %} -->
+    <!-- </article> -->
+    <!-- {% if not loop.last %}
+      <hr>
+    {% endif %} -->
+  {% endfor %}
+{% endblock %}

@@ -1,0 +1,47 @@
+<!doctype html>
+<title>{% block title %}{% endblock %} - Gallery</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<nav>
+  <div style="font-family: serif; color: #377ba8; margin: 1rem 0; font-size: 20px; font-weight: bold;flex:auto; margin: 0;" onclick="window.location.href = '/'">Gallery</div>
+  <ul>
+    {% if g.user %}
+      <li><span>{{ g.user['username'] }}</span>
+      <li><a href="{{ url_for('auth.logout') }}">Log Out</a>
+    {% else %}
+      <li><a href="{{ url_for('auth.register') }}">Register</a>
+      <li><a href="{{ url_for('auth.login') }}">Log In</a>
+    {% endif %}
+  </ul>
+</nav>
+{% for message in get_flashed_messages() %}
+<div class="flash">{{ message }}</div>
+{% endfor %}
+<section class="content">
+
+    {% block header %}{% endblock %}
+  
+  {% block content %}{% endblock %}
+</section>
+
+<section class="content"  style="padding: 0.5rem !important;">
+ 
+    {% block g_header %}{% endblock %}
+
+  {% block g_content %}{% endblock %}
+  <div class="gallery">
+    <div class="close-file">
+      <div style="
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+"></div>
+    </div>
+    <div class="grid-container">
+  {% block grid %}{% endblock %}
+</div>
+  </div>
+  <div ><h3 id="loading">Loading...</h3></div>
+  <iframe id="my_iframe" style="display:none;"></iframe>
+</section>
