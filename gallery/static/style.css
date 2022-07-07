@@ -79,7 +79,7 @@ input[type=submit] { align-self: start; min-width: 10em; }
 }
 
 .g-btn{
-    color: white;padding: 0.4rem;border: 1px solid white;border-radius: 5px;margin: 1rem 1rem;
+    color: white;padding: 0.4rem;border: 1px solid white;border-radius: 5px;margin: 1rem 1rem;cursor: pointer;
 }
 
 .g-title{
@@ -96,4 +96,45 @@ input[type=submit] { align-self: start; min-width: 10em; }
     border-bottom: 1px solid black;
     border-top: 1px solid black;
     padding: 1rem 0;
+}
+
+.color-red{
+  border: 1px solid red !important;
+  color: red !important;
+}
+
+.open-file-container{
+  width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-container{
+  position: fixed;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+}
+
+.nav-controls{
+  display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    z-index: 2000;
+    transform: translate(0, -50%);
+}
+
+.prev{
+  border: 1px solid blue;padding: 10px;border-radius: 5px;box-shadow: 3px 3px rgba(255,255,255,0.1);cursor: pointer;
+}
+
+.next{
+  border: 1px solid blue;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: -3px 3px rgba(255,255,255,0.1);
 }

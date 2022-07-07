@@ -14,7 +14,8 @@ CREATE TABLE post (
   title TEXT NOT NULL,
   file_path TEXT NOT NULL,
   persons TEXT,
-  is_url INTEGER DEFAULT 0,
+  file_size TEXT NOT NULL,
+  file_type TEXT NOT NULL,
   FOREIGN KEY (author_id) REFERENCES user (id)
 );
 

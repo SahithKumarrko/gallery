@@ -10,12 +10,14 @@ from turtle import pos
 from flask import (
     Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 )
+import magic
 import requests
 from tqdm import tqdm
 from werkzeug.exceptions import abort
 from datetime import datetime
 from gallery.auth import login_required
 from gallery.db import get_db
+from hurry.filesize import size, alternative
 
 bp = Blueprint('gallery', __name__)
 bp_files = Blueprint('files', __name__, static_folder="contents", static_url_path="/contents")
@@ -34,7 +36,7 @@ def index():
         print("Posts :: ",len(posts))
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"]})
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
     
         return render_template('gallery/index.html', posts=final, base_url = request.base_url,is_favorites = False)
     return redirect(url_for("auth.login"))
@@ -98,7 +100,8 @@ def load_more(from_row,offset,t):
         
     final = []
     for p in posts:
-        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"]})
+        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
+    print("total new :: ",len(posts),len(final))
     return {'status':200,'from':from_row,'end':from_row + len(final), "posts":final}
 
 @bp.route('/get_favorites', methods=('GET',))
@@ -116,7 +119,7 @@ def get_favorites():
             ).fetchall())
     final = []
     for p in p:
-        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"]})
+        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
     
     return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = True)
 
@@ -134,14 +137,21 @@ def reload_gallery():
             with current_app.open_resource('schema.sql') as dbf:
                     db.executescript(dbf.read().decode('utf8'))
             for f in files:
-                print(f)
                 
-                db.execute(
-                    'INSERT INTO post (created, title, file_path, author_id)'
-                    ' VALUES (?, ?, ?, ?)',
-                    (creation_date(path + f) ,f, f, g.user['id'])
-                )
-                
+                try:
+                    ext = magic.from_file(path + f, mime=True)
+                    ext = ext.split("/")[-1].lower()
+                    _ext = f.split(".")[-1]
+                    _ext = _ext if _ext.lower() in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"] else "file"
+                    print(f, ext)
+                    if ext in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"]:
+                        db.execute(
+                            'INSERT INTO post (created, title, file_path, author_id, file_size, file_type)'
+                            ' VALUES (?, ?, ?, ?, ?, ?)',
+                            (creation_date(path + f) ,f, f, g.user['id'], size(os.path.getsize(path + f),system=alternative), _ext.lower())
+                        )
+                except Exception as exp:
+                    print("Error :: ",exp,f)
         except Exception as exp:
             print("Error :: ",exp,f)
         db.commit()
@@ -161,7 +171,7 @@ def randomize():
         random.shuffle(posts)
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"]})
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
         
         return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = False)
     return redirect(url_for("auth.login"))
@@ -184,7 +194,7 @@ def favorites_randomize():
         random.shuffle(posts)
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"]})
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
         
         return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = True)
     return redirect(url_for("auth.login"))
@@ -205,49 +215,75 @@ def create():
         else:
             file_name = ""
             if url_regex.match(body) is not None:
-                response = requests.get(body, stream=True)
-                ext = body.split("/")[-1].split(".")[-1]
-                if not ext.lower() in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"]:
-                    ext = ''
-                while True:
-                    file_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k = 16)) + ("." if ext != '' else '') + ext
-                    if not os.path.exists(path + file_name):
-                        break
+                response = requests.head(body)
+                headers = response.headers
                 
-                with open(path + file_name, "wb") as handle:
-                    for data in tqdm(response.iter_content()):
-                        handle.write(data)
-            db = get_db()
-            db.execute(
-                'INSERT INTO post (created, title, file_path, author_id)'
-                ' VALUES (?, ?, ?, ?)',
-                (creation_date(path + file_name) , file_name, file_name, g.user['id'])
-            )
-            db.commit()
-            return redirect(url_for('gallery.index'))
+                response = requests.get(body, stream=True)
+                ext = ""
+                if 'content-type' in headers:
+                    _ext = headers['content-type'].split(";")
+                    if len(_ext) > 0:
+                        ext = _ext[0].split("/")[-1]
+                if ext == "":
+                    ext = body.split("/")[-1].split(".")[-1]
+                if not ext.lower() in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"]:
+                    ext = 'file'
+                if ext in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"]:
+                    while True:
+                        file_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k = 16)) + ("." if ext != 'file' else '') + ext
+                        if not os.path.exists(path + file_name):
+                            break
+                    
+                    with open(path + file_name, "wb") as handle:
+                        for data in tqdm(response.iter_content()):
+                            handle.write(data)
+                    db = get_db()
+                    db.execute(
+                        'INSERT INTO post (created, title, file_path, author_id, file_size, file_type)'
+                        ' VALUES (?, ?, ?, ?, ?, ?)',
+                        (creation_date(path + file_name) , file_name, file_name, g.user['id'], size(os.path.getsize(path+file_name),system=alternative), ext.lower())
+                    )
+                    db.commit()
+                    return redirect(url_for('gallery.index'))
+                else:
+                    flash("Not a image/video type.")
+        return {}
 
     return render_template('gallery/create.html')
 
-def get_post(id, check_author=True):
-    post = get_db().execute(
-        'SELECT p.id, title, file_path, persons, created, author_id, username'
-        ' FROM post p JOIN user u ON p.author_id = u.id'
-        ' WHERE p.id = ?',
-        (id,)
-    ).fetchone()
-
+@bp.route('/<int:id>/<string:ptype>/get-post/', methods=('GET', 'POST'))
+@login_required
+def get_post(id, ptype):
+    post = None
+    print("Getting post :: id=",id,"ptype=",ptype)
+    if ptype == "p":
+        post = get_db().execute(
+            'SELECT * '
+            ' FROM post '
+            ' WHERE id = ?',
+            (id,)
+        ).fetchone()
+    
+    if ptype == "favorites":
+        post = get_db().execute(
+            'SELECT * '
+            ' FROM favorites '
+            ' WHERE favorite_id = ?',
+            (id,)
+        ).fetchone()
+    print("GoT POST :: ",post["id"])
     if post is None:
         abort(404, f"Post id {id} doesn't exist.")
 
-    if check_author and post['author_id'] != g.user['id']:
-        abort(403)
-
-    return post
+    # if check_author and post['author_id'] != g.user['id']:
+    #     abort(403)
+    
+    return {'id':post["id"],"author_id":post["author_id"],"created":post["created"],"title":post["title"],"file_path":post["file_path"],"persons":post["persons"],"file_size":post["file_size"],"file_type":post["file_type"]}
 
 @bp.route('/<int:id>/update', methods=('GET', 'POST'))
 @login_required
 def update(id):
-    post = get_post(id)
+    post = get_post(id,"p")
 
     if request.method == 'POST':
         title = request.form['title']
@@ -271,11 +307,16 @@ def update(id):
 
     return render_template('gallery/update.html', post=post)
 
-@bp.route('/<int:id>/delete', methods=('POST',))
+@bp.route('/<int:id>/<string:name>/delete/', methods=('GET','POST'))
 @login_required
-def delete(id):
-    get_post(id)
+def delete(id,name):
     db = get_db()
     db.execute('DELETE FROM post WHERE id = ?', (id,))
+    db.execute('DELETE FROM favorites WHERE favorite_id = ?', (id,))
     db.commit()
-    return redirect(url_for('gallery.index'))
+    f = path + name
+    try:
+        os.remove(f)
+    except:
+        pass
+    return {"status":200}

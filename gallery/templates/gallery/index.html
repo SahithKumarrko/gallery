@@ -23,14 +23,17 @@
     var len = parseInt("{{ posts|length }}");
     var is_favorites = "{{ is_favorites }}" == "True";
     var base_url = '{{ base_url }}';
+    var new_l = false;
     var s = document.documentElement.scrollTop + document.documentElement.clientHeight;
        if (s>=getDocHeight() - 20 && !loading && !complete){
         loading = true;
         console.log("Scrolled to the bottom");
         load_more();
     }
-    function open_image(post_id,id,name,created){
-      console.log(id,post_id,name,is_favorites);
+
+    function open_image(post_id,id,name,created,size,f_type){
+      console.log(id,post_id,name,is_favorites,size,f_type);
+      close_file();
       e = document.getElementById(id).getElementsByTagName("img")[0].cloneNode();
       f = document.getElementsByClassName("open-file");
       if (f.length > 0){
@@ -39,13 +42,87 @@
       f = document.getElementsByClassName("close-file")[0];
       f.classList.remove("close-file");
       f.classList.add("open-file");
-      ff = f.getElementsByTagName("div")
-      ff[0].innerHTML = "";
-      f = f.getElementsByTagName("div")
+      f.innerHTML = "";
       e.style.maxHeight = "65%";
-      
-      f[0].insertAdjacentHTML("afterbegin", `<div style="height: 8%;width: 100%;position: absolute;top: 0;"><div style="display: flex;align-items: center;justify-content: center;"><div class="g-btn" onclick="download_file('`+id + `', '`+name+`','`+ base_url +`');">Download</div><div class="g-btn" onclick="close_file()">Close</div>` + (is_favorites ? `<div class="g-btn" onclick="remove_favorite(`+post_id+`,'`+id+`')">Remove Favorite</div>` : `<div class="g-btn" onclick="favorite(`+post_id+`)">Favorite</div>`) + `</div></div><div class='g-title' style=""><h3>`+name+`</h3><h5 style='color: rgba(255,255,255,0.7) !important;'>`+created+`</h5></div>`)
-      f[0].insertAdjacentElement("afterbegin",e);
+
+      f.insertAdjacentHTML("afterbegin", `<div class="nav-container"><div class="nav-controls"><a class="prev" onclick="plusSlides(-1,'`+id+`')">❮</a><a class="next" onclick="plusSlides(1,'`+id+`')">❯</a></div></div><div class="open-file-container">`+ e.outerHTML +`<div style="height: 8%;width: 100%;position: absolute;top: 0;"><div style="display: flex;align-items: center;justify-content: center;"><div class="g-btn" onclick="download_file('`+id + `', '`+name+`','`+ base_url +`');">Download</div>` + (is_favorites ? `<div class="g-btn" onclick="remove_favorite(`+post_id+`,'`+id+`')">Remove Favorite</div>` : `<div class="g-btn" onclick="favorite(`+post_id+`)">Favorite</div>`) + `<div class="g-btn color-red" onclick="delete_file(`+post_id+`,'`+id+`')">Delete</div><div class="g-btn" onclick="close_file()">Close</div> </div></div><div class='g-title' style=""><h4>`+name+`</h4><h5 style='color: rgba(255,255,255,0.7) !important;'>`+ f_type + " | " + size+`</h5><h5 style='color: rgba(255,255,255,0.7) !important;'>`+created+`</h5></div></div>`)
+    }
+
+    function plusSlides(n,id){
+      console.log("Moving slides :: ",n,id);
+      id = n + parseInt(id.replace( /^\D+/g, ''));
+      console.log("Moving slides :: ",n,id);
+      var prev_len = len;
+      var loading_n = false;
+      var wait = false;
+      loading = false;
+      new_l = false;
+      while(true){
+        if(isNaN(id)){
+          console.log("nan");
+          break;
+        }
+        if(id <= 0){
+          console.log("id");
+          break;
+        }
+        if(!loading && !wait){
+          wait = false;
+        if(new_l){
+          new_l = false;
+          if (prev_len == len){
+            break;
+          }else{
+            prev_len = len;
+          }
+        }
+        if( id > len){
+          console.log("reached end loading more");
+          load_more();
+          new_l = true;
+          continue;
+        }
+        var e = document.getElementById("image-"+id);
+        console.log(id,e);
+        if(e != null){
+          var pid = e.getAttribute("data-postid");
+          console.log("NP POST id slide",pid);
+          const xhttp = new XMLHttpRequest();
+          var tid = id;
+          xhttp.onload = function() {
+            console.log(this.response);
+            var r = JSON.parse(this.response);
+            open_image(pid,"image-"+tid,r["title"],r["created"],r["file_size"],r["file_type"]);
+            
+          }
+          u = "/" + parseInt(pid) + "/" + (is_favorites ? "favorites" : "p") +"/get-post/";
+          xhttp.open("GET", u);
+          xhttp.send();
+          console.log("Req sent for slide ",u);
+          wait = true;
+        }
+        id = id + n;
+      }
+      }
+      console.log("Loaded ",id);
+    }
+
+    function delete_file(post_id, id){
+      name = document.getElementById(id).getElementsByTagName("img")[0].getAttribute("alt");
+      do_d = confirm("Do you really want to delete "+name)
+      if(do_d){
+        console.log("Deleting :: ",post_id,name)
+        const xhttp = new XMLHttpRequest();
+        xhttp.onload = function() {
+          console.log(this.response);
+          console.log("Deleted");
+          close_file();
+        }
+        xhttp.open("GET", post_id + "/" + name +"/delete/");
+        xhttp.send();
+        console.log("Req sent");
+        document.getElementById(id).remove();
+      }
     }
 
     function close_file(){
@@ -55,8 +132,7 @@
         f[0].classList.replace("open-file","close-file")
       }
       f = document.getElementsByClassName("close-file")[0];
-      ff = f.getElementsByTagName("div")
-      ff[0].innerHTML = "";
+      f.innerHTML = "";
     }
 
     function favorite(post_id){
@@ -116,7 +192,7 @@
         var fp = posts[i]['file_path'];
         var img = "/contents/"+fp;
         console.log(fp,img);
-        var html = `<div id="image-`+(len+i+1)+`" onclick="open_image(`+posts[i]["id"]+`,'image-`+(len+i+1)+`', '`+posts[i]["title"]+`','`+posts[i]["created"]+`')"><img src="`+img+`"></div>`;
+        var html = `<div id="image-`+(len+i+1)+`" data-postid='`+ posts[i]["id"] +`' onclick="open_image(`+posts[i]["id"]+`,'image-`+(len+i+1)+`', '`+posts[i]["title"]+`','`+posts[i]["created"]+`','`+ posts[i]["file_size"] +`','`+ posts[i]["file_type"] +`')"><img alt='`+posts[i]["title"]+`' src="`+img+`"></div>`;
         
         e.insertAdjacentHTML("beforeend",html);
       }
@@ -125,23 +201,27 @@
     function load_more(){
       var offset = 3;
       console.log("loadind more",len)
-      const xhttp = new XMLHttpRequest();
+      var xhttp = new XMLHttpRequest();
       var responses = [];
+      loading = true;
       xhttp.onload = function() {
         console.log(this.response);
         var r = JSON.parse(this.response);
-        len = r['end'];
-        loading = false;
+        
         add_posts(r["posts"]);
         if(r["posts"].length != offset){
           complete = true;
           document.getElementById("loading").innerText = "No more photos/videos.";
         }
         console.log("Complete");
+        new_l = true;
+        len = r['end'];
+        loading = false;
       }
-      type = "{{ is_favorites }}" == "True" ? "favorites" : "p";
+      type = is_favorites ? "favorites" : "p";
       xhttp.open("GET", "/load-more/" + len +"/" + offset +"/" +type);
       xhttp.send();
+      console.log("Req sent load more","/load-more/" + len +"/" + offset +"/" +type);
     }
 
     window.onscroll = function()
@@ -172,11 +252,14 @@
       {% set name = post['title'] %}
       {% set created_on = post['created'] %}
       {% set post_id = post['id'] %}
+      {% set size = post['file_size'] %}
+      {% set type = post['file_type'] %}
       
       <!-- {% if post['is_url'] == 1 %}
       <div id="image-{{ loop.index }}" onclick="open_image('image-{{ loop.index }}','{{ name }}','{{ base_url }}')"><img src="{{ post['file_path'] }}"></div>
       {% else %} -->
-      <div id="image-{{ loop.index }}" onclick="open_image('{{post_id}}','image-{{ loop.index }}','{{ name }}', '{{ created_on }}')"><img src="{{ url_for('files.static',filename=post['file_path']) }}" ></div>
+      
+      <div id="image-{{ loop.index }}" data-postid="{{ post_id }}" onclick="open_image('{{post_id}}','image-{{ loop.index }}','{{ name }}', '{{ created_on }}', '{{ size }}', '{{ type }}')"><img  alt="{{ name }}" src="{{ url_for('files.static',filename=post['file_path']) }}" ></div>
       <!-- {% endif %} -->
     <!-- </article> -->
     <!-- {% if not loop.last %}
