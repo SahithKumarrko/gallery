@@ -31,12 +31,12 @@ def index():
         posts = db.execute(
             'SELECT *'
             ' FROM post'
-            ' ORDER BY created DESC limit 3'
+            ' ORDER BY created DESC limit 10'
         ).fetchall()
         print("Posts :: ",len(posts))
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
     
         return render_template('gallery/index.html', posts=final, base_url = request.base_url,is_favorites = False)
     return redirect(url_for("auth.login"))
@@ -101,7 +101,7 @@ def load_more(from_row,offset,t):
         return abort(500)
     final = []
     for p in posts:
-        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
+        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
     print("total new :: ",len(posts),len(final))
     return {'status':200,'from':from_row,'end':from_row + len(final), "posts":final}
 
@@ -110,17 +110,16 @@ def load_more(from_row,offset,t):
 def get_favorites():
     db = get_db()
     res = []
-    res = db.execute(
-                f'Select * from favorites',
+    p = db.execute(
+                f'Select * from post where id in (Select favorite_id from favorites limit 10)',
             ).fetchall()
-    p = []
-    for r in res:
-        p.extend(db.execute(
-                f'Select * from post where id={int(r["favorite_id"])}',
-            ).fetchall())
+    # for r in res:
+    #     p.extend(db.execute(
+    #             f'Select * from post where id={int(r["favorite_id"])}',
+    #         ).fetchall())
     final = []
     for p in p:
-        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
+        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
     
     return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = True)
 
@@ -143,9 +142,9 @@ def reload_gallery():
                     ext = magic.from_file(path + f, mime=True)
                     ext = ext.split("/")[-1].lower()
                     _ext = f.split(".")[-1]
-                    _ext = _ext if _ext.lower() in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"] else "file"
+                    _ext = _ext if _ext.lower() in ["jpeg", "jpg", "mp4","3gp","mov","wmv","avi","flv","mkv","ogg", "png", "gif", "tiff"] else "file"
                     print(f, ext)
-                    if ext in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"]:
+                    if ext in ["jpeg", "jpg", "mp4","3gp","mov","wmv","avi","flv","mkv","ogg", "png", "gif", "tiff"]:
                         db.execute(
                             'INSERT INTO post (created, title, file_path, author_id, file_size, file_type)'
                             ' VALUES (?, ?, ?, ?, ?, ?)',
@@ -166,13 +165,13 @@ def randomize():
         posts = db.execute(
             'SELECT *'
             ' FROM post'
-            ' ORDER BY created DESC'
+            ' ORDER BY random() limit 10'
         ).fetchall()
         print("Posts :: ",len(posts))
         random.shuffle(posts)
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
         
         return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = False)
     return redirect(url_for("auth.login"))
@@ -182,20 +181,13 @@ def randomize():
 def favorites_randomize():
     if g.user is not None:
         db = get_db()
-        f = db.execute(
-            'SELECT *'
-            ' FROM favorites'
-        ).fetchall()
-        print("Posts :: ",len(f))
-        posts = []
-        for r in f:
-            posts.extend(db.execute(
-                    f'Select * from post where id={int(r["favorite_id"])}',
-                ).fetchall())
+        posts = db.execute(
+                f'Select * from post where id in (Select favorite_id from favorites order by random() limit 10)',
+            ).fetchall()
         random.shuffle(posts)
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
         
         return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = True)
     return redirect(url_for("auth.login"))
@@ -227,9 +219,9 @@ def create():
                         ext = _ext[0].split("/")[-1]
                 if ext == "":
                     ext = body.split("/")[-1].split(".")[-1]
-                if not ext.lower() in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"]:
+                if not ext.lower() in ["jpeg", "jpg", "mp4","3gp","mov","wmv","avi","flv","mkv","ogg", "png", "gif", "tiff"]:
                     ext = 'file'
-                if ext in ["jpeg", "jpg", "mp4", "png", "gif", "tiff"]:
+                if ext in ["jpeg", "jpg", "mp4","3gp","mov","wmv","avi","flv","mkv","ogg", "png", "gif", "tiff"]:
                     while True:
                         file_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k = 16)) + ("." if ext != 'file' else '') + ext
                         if not os.path.exists(path + file_name):
@@ -276,8 +268,7 @@ def get_post(id, ptype):
 
     # if check_author and post['author_id'] != g.user['id']:
     #     abort(403)
-    
-    return {'id':post["id" if ptype == "p" else "favorite_id"],"author_id":post["author_id"],"created":post["created"],"title":post["title"],"file_path":post["file_path"],"persons":post["persons"],"file_size":post["file_size"],"file_type":post["file_type"]}
+    return {'id':post["id" if ptype == "p" else "favorite_id"],"author_id":post["author_id"],"created":post["created"],"title":post["title"],"file_path":post["file_path"],"persons":post["persons"],"file_size":post["file_size"],"file_type":post["file_type"],"is_video":post["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]}
 
 @bp.route('/<int:id>/update', methods=('GET', 'POST'))
 @login_required

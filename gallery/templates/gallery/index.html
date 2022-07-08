@@ -222,20 +222,32 @@
     }
 
     function add_posts(posts){
-      console.log("Adding posts :: ",posts);
       e = document.getElementsByClassName("grid-container")[0];
       for(var i = 0;i<posts.length;i++){
         var fp = posts[i]['file_path'];
         var img = "/contents/"+fp;
-        console.log(fp,img);
-        var html = `<div id="image-`+(len+i+1)+`" data-postid='`+ posts[i]["id"] +`' onclick="open_image(`+posts[i]["id"]+`,'image-`+(len+i+1)+`', '`+posts[i]["title"]+`','`+posts[i]["created"]+`','`+ posts[i]["file_size"] +`','`+ posts[i]["file_type"] +`')"><img alt='`+posts[i]["title"]+`' src="`+img+`"></div>`;
-        
+        var html = `<div id="image-`+(len+i+1)+`" data-postid='`+ posts[i]["id"] +`' onclick="open_image(`+posts[i]["id"]+`,'image-`+(len+i+1)+`', '`+posts[i]["title"]+`','`+posts[i]["created"]+`','`+ posts[i]["file_size"] +`','`+ posts[i]["file_type"] +`')">`
+        if(posts[i]["is_video"]){
+          html = html + `<video class="g-content video" muted loop><source src="`+ "/contents/"+fp +`" type="video/`+posts[i]['file_type']+`"></video></div>`;
+        }
+        else{
+          html = html + `<img class="g-content" alt='`+posts[i]["title"]+`' src="`+img+`"></div>`;
+        }
         e.insertAdjacentHTML("beforeend",html);
+        if(posts[i]["is_video"]){
+          $("#image-"+(len+i+1) + " video").each(function(){
+            if ($(this).is(":in-viewport")) {
+                $(this)[0].play();
+            } else {
+                $(this)[0].pause();
+            }
+          });
+        }
       }
     }
 
     async function load_more(){
-      var offset = 3;
+      var offset = 15;
       console.log("loadind more",len)
       var xhttp = new XMLHttpRequest();
       var responses = [];
@@ -295,11 +307,26 @@
       <div id="image-{{ loop.index }}" onclick="open_image('image-{{ loop.index }}','{{ name }}','{{ base_url }}')"><img src="{{ post['file_path'] }}"></div>
       {% else %} -->
       
-      <div id="image-{{ loop.index }}" data-postid="{{ post_id }}" onclick="open_image('{{post_id}}','image-{{ loop.index }}','{{ name }}', '{{ created_on }}', '{{ size }}', '{{ type }}')"><img  alt="{{ name }}" src="{{ url_for('files.static',filename=post['file_path']) }}" ></div>
+      <div id="image-{{ loop.index }}" data-postid="{{ post_id }}" onclick="open_image('{{post_id}}','image-{{ loop.index }}','{{ name }}', '{{ created_on }}', '{{ size }}', '{{ type }}')">
+        {% if post['is_video'] %}
+          <video class="g-content video" muted loop><source src="{{ url_for('files.static',filename=post['file_path']) }}" type="video/{{ post['file_type'] }}"></video>
+        {% else %}
+          <img  alt="{{ name }}" class="g-content" src="{{ url_for('files.static',filename=post['file_path']) }}" >
+        {% endif %}
+      </div>
       <!-- {% endif %} -->
     <!-- </article> -->
     <!-- {% if not loop.last %}
       <hr>
     {% endif %} -->
   {% endfor %}
+  <script>
+    $('video').each(function(){
+    if ($(this).is(":in-viewport")) {
+        $(this)[0].play();
+    } else {
+        $(this)[0].pause();
+    }
+  })
+  </script>
 {% endblock %}

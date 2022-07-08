@@ -1,6 +1,9 @@
 <!doctype html>
 <title>{% block title %}{% endblock %} - Gallery</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="{{ url_for('static', filename='js/jquery-3.6.0.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/isInViewport.min.js') }}"></script>
+
 <nav>
   <div style="font-family: serif; color: #377ba8; margin: 1rem 0; font-size: 20px; font-weight: bold;flex:auto; margin: 0;" onclick="window.location.href = '/'">Gallery</div>
   <ul>

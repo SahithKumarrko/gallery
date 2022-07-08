@@ -51,11 +51,11 @@ input[type=submit] { align-self: start; min-width: 10em; }
     transition: all 0.25s ease-in-out;
     background-color: rgba(0, 0, 0, 0.8);
   }
-  .gallery .grid-container div:hover img {
+  .gallery .grid-container div:hover .g-content {
     transform: scale(1.06);
   }
   
-  .gallery .grid-container div img {
+  .gallery .grid-container div .g-content {
     width: 100%;
     transition: all 0.25s ease-in-out;
   }
