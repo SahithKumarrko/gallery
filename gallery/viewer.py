@@ -95,9 +95,10 @@ def load_more(from_row,offset,t):
     db = get_db()
     if t == "p":
         posts = db.execute(f'select * from post ORDER BY created DESC limit {offset} Offset {from_row}').fetchall()
-    if t == "favorites":
+    elif t == "favorites":
         posts = db.execute(f'select * from post where id in (select favorite_id from favorites limit {offset} Offset {from_row}) ORDER BY created DESC').fetchall()
-        
+    else:
+        return abort(500)
     final = []
     for p in posts:
         final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"]})
@@ -266,19 +267,17 @@ def get_post(id, ptype):
     
     if ptype == "favorites":
         post = get_db().execute(
-            'SELECT * '
-            ' FROM favorites '
-            ' WHERE favorite_id = ?',
+            'select * from post, (SELECT favorite_id FROM favorites WHERE favorite_id = ? LIMIT 1) f where id=f.favorite_id',
             (id,)
         ).fetchone()
-    print("GoT POST :: ",post["id"])
+    print("GoT POST :: ",post)
     if post is None:
         abort(404, f"Post id {id} doesn't exist.")
 
     # if check_author and post['author_id'] != g.user['id']:
     #     abort(403)
     
-    return {'id':post["id"],"author_id":post["author_id"],"created":post["created"],"title":post["title"],"file_path":post["file_path"],"persons":post["persons"],"file_size":post["file_size"],"file_type":post["file_type"]}
+    return {'id':post["id" if ptype == "p" else "favorite_id"],"author_id":post["author_id"],"created":post["created"],"title":post["title"],"file_path":post["file_path"],"persons":post["persons"],"file_size":post["file_size"],"file_type":post["file_type"]}
 
 @bp.route('/<int:id>/update', methods=('GET', 'POST'))
 @login_required

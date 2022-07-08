@@ -48,7 +48,45 @@
       f.insertAdjacentHTML("afterbegin", `<div class="nav-container"><div class="nav-controls"><a class="prev" onclick="plusSlides(-1,'`+id+`')">❮</a><a class="next" onclick="plusSlides(1,'`+id+`')">❯</a></div></div><div class="open-file-container">`+ e.outerHTML +`<div style="height: 8%;width: 100%;position: absolute;top: 0;"><div style="display: flex;align-items: center;justify-content: center;"><div class="g-btn" onclick="download_file('`+id + `', '`+name+`','`+ base_url +`');">Download</div>` + (is_favorites ? `<div class="g-btn" onclick="remove_favorite(`+post_id+`,'`+id+`')">Remove Favorite</div>` : `<div class="g-btn" onclick="favorite(`+post_id+`)">Favorite</div>`) + `<div class="g-btn color-red" onclick="delete_file(`+post_id+`,'`+id+`')">Delete</div><div class="g-btn" onclick="close_file()">Close</div> </div></div><div class='g-title' style=""><h4>`+name+`</h4><h5 style='color: rgba(255,255,255,0.7) !important;'>`+ f_type + " | " + size+`</h5><h5 style='color: rgba(255,255,255,0.7) !important;'>`+created+`</h5></div></div>`)
     }
 
-    function plusSlides(n,id){
+    async function sendRequest(method,url) {
+      // code below here will only execute when await makeRequest() finished loading
+      var res = await makeRequest(method, url);
+      return res;
+    }
+
+    function makeRequest(method, url) {
+    return new Promise(function (resolve, reject) {
+        let xhr = new XMLHttpRequest();
+        xhr.open(method, url);
+        xhr.onload = function () {
+          console.log("loaded");
+            if (this.status >= 200 && this.status < 300) {
+                resolve({
+                  status: this.status,
+                    statusText: xhr.response,
+                    error: false,
+                });
+            } else {
+                resolve({
+                    status: this.status,
+                    statusText: xhr.statusText,
+                    error: true,
+                });
+            }
+        };
+        xhr.onerror = function () {
+          console.log("Error");
+            resolve({
+                status: this.status,
+                statusText: xhr.statusText,
+                error: true,
+            });
+        };
+        xhr.send();
+    });
+  }
+
+    async function plusSlides(n,id){
       console.log("Moving slides :: ",n,id);
       id = n + parseInt(id.replace( /^\D+/g, ''));
       console.log("Moving slides :: ",n,id);
@@ -66,8 +104,8 @@
           console.log("id");
           break;
         }
-        if(!loading && !wait){
-          wait = false;
+        if(!loading){
+          loading = false;
         if(new_l){
           new_l = false;
           if (prev_len == len){
@@ -78,7 +116,7 @@
         }
         if( id > len){
           console.log("reached end loading more");
-          load_more();
+          await load_more();
           new_l = true;
           continue;
         }
@@ -86,20 +124,18 @@
         console.log(id,e);
         if(e != null){
           var pid = e.getAttribute("data-postid");
-          console.log("NP POST id slide",pid);
-          const xhttp = new XMLHttpRequest();
-          var tid = id;
-          xhttp.onload = function() {
-            console.log(this.response);
-            var r = JSON.parse(this.response);
-            open_image(pid,"image-"+tid,r["title"],r["created"],r["file_size"],r["file_type"]);
-            
-          }
           u = "/" + parseInt(pid) + "/" + (is_favorites ? "favorites" : "p") +"/get-post/";
-          xhttp.open("GET", u);
-          xhttp.send();
+          console.log("NP POST id slide",pid);
+          var r = await sendRequest("GET",u);
+          console.log(r);
+          
           console.log("Req sent for slide ",u);
-          wait = true;
+          if(!r["error"]){
+            var final = JSON.parse(r["statusText"]);
+            console.log("goin to another image");
+            open_image(pid,"image-"+id,final["title"],final["created"],final["file_size"],final["file_type"]);
+          }
+          return;
         }
         id = id + n;
       }
@@ -198,15 +234,17 @@
       }
     }
 
-    function load_more(){
+    async function load_more(){
       var offset = 3;
       console.log("loadind more",len)
       var xhttp = new XMLHttpRequest();
       var responses = [];
       loading = true;
-      xhttp.onload = function() {
-        console.log(this.response);
-        var r = JSON.parse(this.response);
+      var type = type = is_favorites ? "favorites" : "p";
+      var url = "/load-more/" + len +"/" + offset +"/" +type;
+      var res = await sendRequest("GET",url);
+      if(!res["error"]){
+        var r = JSON.parse(res["statusText"]);
         
         add_posts(r["posts"]);
         if(r["posts"].length != offset){
@@ -214,14 +252,12 @@
           document.getElementById("loading").innerText = "No more photos/videos.";
         }
         console.log("Complete");
-        new_l = true;
+        
         len = r['end'];
-        loading = false;
       }
-      type = is_favorites ? "favorites" : "p";
-      xhttp.open("GET", "/load-more/" + len +"/" + offset +"/" +type);
-      xhttp.send();
-      console.log("Req sent load more","/load-more/" + len +"/" + offset +"/" +type);
+      new_l = true;
+      loading = false;
+      console.log("Req sent load more",url);
     }
 
     window.onscroll = function()
