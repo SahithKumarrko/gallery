@@ -8,7 +8,7 @@ import string
 import time
 from turtle import pos
 from flask import (
-    Blueprint, current_app, flash, g, redirect, render_template, request, url_for
+    Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, url_for
 )
 import magic
 import requests
@@ -36,9 +36,9 @@ def index():
         print("Posts :: ",len(posts))
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
-    
-        return render_template('gallery/index.html', posts=final, base_url = request.base_url,is_favorites = False)
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"], "is_favorite":p["is_favorite"]})
+
+        return render_template('gallery/index.html', posts=final, base_url = request.base_url,is_favorites = False, ids = [],is_randomized=False)
     return redirect(url_for("auth.login"))
 
 
@@ -68,11 +68,11 @@ def favorite(id):
     db = get_db()
     res = []
     res = db.execute(
-                f'Select * from favorites where favorite_id="{id}"',
+                f'Select * from post where id={id} and is_favorite=1',
             ).fetchall()
     if len(res) == 0:
         db.execute(
-                    f'INSERT INTO favorites (favorite_id) VALUES ("{id}")'
+                    f'UPDATE post set is_favorite=1 where id={id}'
                 )
         db.commit()
         print("Saved")
@@ -82,12 +82,12 @@ def favorite(id):
 @login_required
 def remove_favorite(id):
     db = get_db()
-    db.execute(f'DELETE From favorites where favorite_id={id}')
+    db.execute(f'UPDATE post set is_favorite=0 where id={id}')
     db.commit()
     print("Saved")
     return {'status':200}
 
-@bp.route('/load-more/<int:from_row>/<int:offset>/<string:t>', methods=('GET',))
+@bp.route('/load-more/<int:from_row>/<int:offset>/<string:t>', methods=('GET','POST'))
 @login_required
 def load_more(from_row,offset,t):
     print("Loading more for :: ",t , from_row)
@@ -96,14 +96,24 @@ def load_more(from_row,offset,t):
     if t == "p":
         posts = db.execute(f'select * from post ORDER BY created DESC limit {offset} Offset {from_row}').fetchall()
     elif t == "favorites":
-        posts = db.execute(f'select * from post where id in (select favorite_id from favorites limit {offset} Offset {from_row}) ORDER BY created DESC').fetchall()
+        posts = db.execute(f'select * from post where is_favorite=1 ORDER BY created DESC limit {offset} Offset {from_row}').fetchall()
+    elif t == "random-p":
+        ids = request.json
+        query = f'select * from post where id not in ({",".join(map(str,ids["ids"]))}) ORDER BY random() limit {offset} Offset {from_row}'
+        print("Query ::",query)
+        posts = db.execute(query).fetchall()
+    elif t == "random-favorites":
+        ids = request.json
+        query = f'select * from post where id not in ({",".join(map(str,ids["ids"]))}) and is_favorite=1 ORDER BY random() limit {offset} Offset {from_row}'
+        posts = db.execute(query).fetchall()
     else:
         return abort(500)
     final = []
     for p in posts:
-        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
+        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"], "is_favorite":p["is_favorite"]})
     print("total new :: ",len(posts),len(final))
-    return {'status':200,'from':from_row,'end':from_row + len(final), "posts":final}
+    ids = [i["id"] for i in final]
+    return {'status':200,'from':from_row,'end':from_row + len(final), "posts":final, "ids": ids}
 
 @bp.route('/get_favorites', methods=('GET',))
 @login_required
@@ -111,7 +121,7 @@ def get_favorites():
     db = get_db()
     res = []
     p = db.execute(
-                f'Select * from post where id in (Select favorite_id from favorites limit 10)',
+                f'Select * from post where is_favorite=1 limit 10',
             ).fetchall()
     # for r in res:
     #     p.extend(db.execute(
@@ -119,9 +129,9 @@ def get_favorites():
     #         ).fetchall())
     final = []
     for p in p:
-        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
+        final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"], "is_favorite":p["is_favorite"]})
     
-    return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = True)
+    return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = True, ids = [],is_randomized=False)
 
 
 @bp.route('/reload-gallery', methods=('GET',))
@@ -171,9 +181,9 @@ def randomize():
         random.shuffle(posts)
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
-        
-        return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = False)
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"], "is_favorite":p["is_favorite"]})
+        ids = [i["id"] for i in final]
+        return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = False, ids = ids, is_randomized=True)
     return redirect(url_for("auth.login"))
 
 @bp.route('/get_favorites/randomize', methods=('GET',))
@@ -182,14 +192,14 @@ def favorites_randomize():
     if g.user is not None:
         db = get_db()
         posts = db.execute(
-                f'Select * from post where id in (Select favorite_id from favorites order by random() limit 10)',
+                f'Select * from post where is_favorite=1 order by random() limit 10',
             ).fetchall()
         random.shuffle(posts)
         final = []
         for p in posts:
-            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]})
+            final.append({'id':p["id"],"author_id":p["author_id"],"created":p["created"],"title":p["title"],"file_path":p["file_path"],"persons":p["persons"],"file_size":p["file_size"],"file_type":p["file_type"],"is_video":p["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"], "is_favorite":p["is_favorite"]})
         
-        return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = True)
+        return render_template('gallery/index.html', posts=final, base_url = request.base_url, is_favorites = True,ids = [i["id"] for i in final],is_randomized=True)
     return redirect(url_for("auth.login"))
 
 @bp.route('/create', methods=('GET', 'POST'))
@@ -249,26 +259,26 @@ def create():
 def get_post(id, ptype):
     post = None
     print("Getting post :: id=",id,"ptype=",ptype)
-    if ptype == "p":
-        post = get_db().execute(
-            'SELECT * '
-            ' FROM post '
-            ' WHERE id = ?',
-            (id,)
-        ).fetchone()
+    # if ptype == "p":
+    post = get_db().execute(
+        'SELECT * '
+        ' FROM post '
+        ' WHERE id = ?',
+        (id,)
+    ).fetchone()
     
-    if ptype == "favorites":
-        post = get_db().execute(
-            'select * from post, (SELECT favorite_id FROM favorites WHERE favorite_id = ? LIMIT 1) f where id=f.favorite_id',
-            (id,)
-        ).fetchone()
-    print("GoT POST :: ",post)
+    # if ptype == "favorites":
+    #     post = get_db().execute(
+    #         'select * from post where id=?',
+    #         (id,)
+    #     ).fetchone()
+    print("GoT POST :: ",post["id"])
     if post is None:
         abort(404, f"Post id {id} doesn't exist.")
 
     # if check_author and post['author_id'] != g.user['id']:
     #     abort(403)
-    return {'id':post["id" if ptype == "p" else "favorite_id"],"author_id":post["author_id"],"created":post["created"],"title":post["title"],"file_path":post["file_path"],"persons":post["persons"],"file_size":post["file_size"],"file_type":post["file_type"],"is_video":post["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"]}
+    return {'id':post["id"],"author_id":post["author_id"],"created":post["created"],"title":post["title"],"file_path":post["file_path"],"persons":post["persons"],"file_size":post["file_size"],"file_type":post["file_type"],"is_video":post["file_type"] in ["mp4","3gp","mov","wmv","avi","flv","mkv","ogg"], "is_favorite":post["is_favorite"]}
 
 @bp.route('/<int:id>/update', methods=('GET', 'POST'))
 @login_required
@@ -302,7 +312,6 @@ def update(id):
 def delete(id,name):
     db = get_db()
     db.execute('DELETE FROM post WHERE id = ?', (id,))
-    db.execute('DELETE FROM favorites WHERE favorite_id = ?', (id,))
     db.commit()
     f = path + name
     try:

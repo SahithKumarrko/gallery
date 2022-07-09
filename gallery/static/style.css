@@ -110,7 +110,9 @@ input[type=submit] { align-self: start; min-width: 10em; }
     align-items: center;
     justify-content: center;
 }
-
+.open-file-container *{
+  max-width: 65% !important;
+}
 .nav-container{
   position: fixed;
     top: 50%;

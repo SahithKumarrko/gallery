@@ -16,9 +16,6 @@ CREATE TABLE post (
   persons TEXT,
   file_size TEXT NOT NULL,
   file_type TEXT NOT NULL,
+  is_favorite INT DEFAULT 0,
   FOREIGN KEY (author_id) REFERENCES user (id)
-);
-
-CREATE TABLE IF NOT EXISTS favorites (
-  favorite_id TEXT
 );

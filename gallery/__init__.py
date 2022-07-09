@@ -42,7 +42,7 @@ def create_app(test_config=None):
         date = datetime.strptime(date, actual_fmt)
         native = date.replace(tzinfo=None)
         return native.strftime(to_format) 
-
+    
     # a simple page that says hello
     @app.route('/hello')
     def hello():
